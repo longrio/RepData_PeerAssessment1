@@ -1,0 +1,185 @@
+---
+title: "Reproducible Research Course Project 1"
+author: "Longrio Platil"
+date: "February 12, 2019"
+output: html_document
+---
+
+This is the report on the codes and plots in completing the Coursera Reproducible Research Course Project 1. 
+
+This Course Project deals with the data on the physical activity of users, particularly on number of steps per day, obtained through devices such as Fitbit.
+
+## Loading and preprocessing the data
+
+Load the data and save it into the data frame "activity". Make sure that this document and the data resides in your current directory. Necessary adjustments should be made to the data including transforming the date column into the proper date format.
+
+```{r loaddata}
+activity <- read.csv("./activity.csv", header=TRUE)
+activity[,2] <- as.Date(activity$date)
+```
+
+Now let's see how our data looks like:
+```{r datahead}
+str(activity)
+```
+
+We are ready to answer the following questions:
+
+### What is the mean total number of steps taken per day?
+
+We must first make a histogram of the total number of steps taken each day.
+
+```{r histsteps}
+library(ggplot2)
+Q2<-data.frame(tapply(activity$steps,activity$date,sum,na.rm=TRUE))
+Q2$date<-rownames(Q2)
+rownames(Q2)<-NULL
+names(Q2)[[1]]<-"Total Steps"
+png("plot1.png")
+#Total Steps by date bar chart
+ggplot(Q2,aes(y=Q2$`Total Steps`,x=Q2$date))+geom_bar(stat="identity") + ylab("Total Steps")+xlab("Date")+ggtitle("Total Steps by date")
+dev.off()
+ggplot(Q2,aes(y=Q2$`Total Steps`,x=Q2$date))+geom_bar(stat="identity") + ylab("Total Steps")+xlab("Date")+ggtitle("Total Steps by date")
+#Histogram of total steps
+qplot(Q2$`Total Steps`,geom="histogram",xlab="Total Steps",ylab="Counts",main="Total Steps Histogram")
+png("plot1.1.png")
+qplot(Q2$`Total Steps`,geom="histogram",xlab="Total Steps",ylab="Counts",main="Total Steps Histogram")
+dev.off()
+```
+
+The second part is calculating the mean and median of the total number of steps taken per day.
+
+```{r meansteps}
+Steps<-with(activity,tapply(steps,date,sum,na.rm=TRUE))
+print(mean_steps<-mean(Steps))
+```
+
+```{r mediansteps}
+print(median_steps<-median(Steps))
+```
+
+Thus, the mean number of steps per day is 9354.23 and the median number of steps per day is 10395. Let's try to look at the summary of the total steps taken each day.
+
+```{r summsteps}
+summary(Steps)
+```
+
+### What is the average daily activity pattern?
+
+To answer this question, let us make a daily activity pattern using a time series plot of the 5-minute interval and the average number of steps taken, averaged across all days.
+
+```{r timeseries}
+avg_steps<-with(activity,tapply(steps,interval,mean,na.rm=TRUE))
+intervals<-unique(activity$interval)
+new<-data.frame(cbind(avg_steps,intervals))
+plot(new$intervals,new$avg_steps,type = "l",xlab = "5-min Intervals",
+     ylab = "Average Steps across all days",main = "Average Steps per Interval")
+```
+
+Based on the line graph, the maximum can be seen somewhere between 500 to 1000. To compute, we have
+
+```{r maxsteps}
+index<-which.max(new$avg_steps)
+max<-new[index,2]
+print(max)
+```
+
+Thus the interval with the most steps averaged among all days is 835.
+
+### Inputting missing values
+
+From our data, some days have NA values. This may mean that the user forgot to switch their devices on. We will try to calculate the total number of missing values in the dataset. 
+
+```{r misssing}
+sum(is.na(activity$steps))
+```
+
+Thus, there are 2304 rows with missing or NA values on them.
+
+Let us now input values to replace the NA values of the data.
+
+```{r inputNA}
+Steps_Avg<-with(activity,tapply(steps,date,mean,na.rm=TRUE))
+na<-mean(Steps_Avg,na.rm = TRUE)
+activityNoNA<-activity
+for(i in 1:nrow(activityNoNA)){
+    if(is.na(activityNoNA[i,]$steps)){
+        activityNoNA[i,]$steps <- na
+    }
+}
+
+```
+
+Let's check if there are still NA values:
+
+```{r NAcheck}
+sum(is.na(activityNoNA$steps))
+```
+
+There are now 0 rows with NA values in them. Let's check the data again.
+
+```{r w/oNA}
+str(activityNoNA)
+```
+
+We must then look at the histogram of the new dataset.
+
+```{r histsteps new}
+library(ggplot2)
+Q3<-data.frame(tapply(activityNoNA$steps,activityNoNA$date,sum,na.rm=TRUE))
+Q3$date<-rownames(Q3)
+rownames(Q3)<-NULL
+names(Q3)[[1]]<-"Total Steps"
+png("plot2a.png")
+#Total Steps by date bar chart
+ggplot(Q3,aes(y=Q3$`Total Steps`,x=Q3$date))+geom_bar(stat="identity") + ylab("Total Steps")+xlab("Date")+ggtitle("Total Steps by date")
+dev.off()
+ggplot(Q3,aes(y=Q3$`Total Steps`,x=Q3$date))+geom_bar(stat="identity") + ylab("Total Steps")+xlab("Date")+ggtitle("Total Steps by date")
+#Histogram of total steps
+qplot(Q3$`Total Steps`,geom="histogram",xlab="Total Steps",ylab="Counts",main="Total Steps Histogram")
+png("plot2b.png")
+qplot(Q3$`Total Steps`,geom="histogram",xlab="Total Steps",ylab="Counts",main="Total Steps Histogram")
+dev.off()
+```
+
+We would also like to check if the mean and median are also changed.
+
+```{r meansteps2}
+Steps2<-with(activityNoNA,tapply(steps,date,sum,na.rm=TRUE))
+print(mean_steps<-mean(Steps2))
+```
+
+```{r mediansteps2}
+print(median_steps<-median(Steps2))
+```
+
+We notice that the mean and median of the new dataset is different from the original dataset with NA values in them. Also, after inputting missing values in the data, the mean and median became equal.
+
+### Are there differences in activity patterns between weekdays and weekends?
+
+The next part shows whether there are diffrences between activity patterns on weekdays and weekends occur. First, a classification on the date should be made whether it is a weekday or a weekend.
+
+```{r weekday or end}
+activityNoNA$date <- as.Date(strptime(activityNoNA$date, format="%Y-%m-%d"))
+activityNoNA$day <- weekdays(activityNoNA$date)
+for (i in 1:nrow(activityNoNA)) {
+    if (activityNoNA[i,]$day %in% c("Saturday","Sunday")) {
+        activityNoNA[i,]$day<-"weekend"
+    }
+    else{
+        activityNoNA[i,]$day<-"weekday"
+    }
+}
+stepsByDay <- aggregate(activityNoNA$steps ~ activityNoNA$interval + activityNoNA$day, activityNoNA, mean)
+```
+
+Let us now compare the activity patterns between weekends and weekdays by making a panel of time series plots.
+
+```{r panel}
+names(stepsByDay) <- c("interval", "day", "steps")
+library(lattice)
+xyplot(steps ~ interval | day, stepsByDay, type = "l", layout = c(1, 2), 
+    xlab = "Interval", ylab = "Number of steps")
+```
+
+From the panel, we can see that there is indeed a difference between users' activity patterns on weekdays and weekends.
